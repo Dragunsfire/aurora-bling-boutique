@@ -2,24 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import SectionContainer from '@/components/ui/section-container';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createOrder } from '@/data/orders';
 import { ShippingInfo, PaymentInfo } from '@/data/orders';
-import { PAYMENT_METHODS, PaymentMethodType } from '@/types/payment';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import ShippingForm from '@/components/checkout/ShippingForm';
+import PaymentMethodForm from '@/components/checkout/PaymentMethodForm';
+import OrderSummary from '@/components/checkout/OrderSummary';
+import { PAYMENT_METHODS } from '@/types/payment';
 
 const CheckoutPage: React.FC = () => {
   const { t, language } = useLanguage();
-  const { formatPrice, currency } = useCurrency();
+  const { currency } = useCurrency();
   const { items, subtotal, clearCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,10 +42,9 @@ const CheckoutPage: React.FC = () => {
   });
   
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const { toast } = useToast();
   
-  const shippingCost = subtotal > 100 ? 0 : 10; // Free shipping over $100
-  const taxRate = 0.07; // 7% tax
+  const shippingCost = subtotal > 100 ? 0 : 10;
+  const taxRate = 0.07;
   const taxAmount = subtotal * taxRate;
   const total = subtotal + shippingCost + taxAmount;
   
@@ -217,7 +217,6 @@ const CheckoutPage: React.FC = () => {
         );
         
         clearCart();
-        
         navigate(`/order-confirmation/${order.id}`);
       }
     } catch (error) {
@@ -241,347 +240,32 @@ const CheckoutPage: React.FC = () => {
       <SectionContainer title={t('checkout.title')}>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="col-span-2 space-y-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
-                {t('checkout.shipping')}
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">{t('checkout.firstName')}</Label>
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    value={shippingInfo.firstName}
-                    onChange={handleShippingChange}
-                    className={errors.firstName ? 'border-red-500' : ''}
-                  />
-                  {errors.firstName && (
-                    <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="lastName">{t('checkout.lastName')}</Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    value={shippingInfo.lastName}
-                    onChange={handleShippingChange}
-                    className={errors.lastName ? 'border-red-500' : ''}
-                  />
-                  {errors.lastName && (
-                    <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="email">{t('checkout.email')}</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={shippingInfo.email}
-                    onChange={handleShippingChange}
-                    className={errors.email ? 'border-red-500' : ''}
-                  />
-                  {errors.email && (
-                    <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="phone">{t('checkout.phone')}</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={shippingInfo.phone}
-                    onChange={handleShippingChange}
-                    className={errors.phone ? 'border-red-500' : ''}
-                  />
-                  {errors.phone && (
-                    <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-                  )}
-                </div>
-                
-                <div className="md:col-span-2">
-                  <Label htmlFor="address">{t('checkout.address')}</Label>
-                  <Input
-                    id="address"
-                    name="address"
-                    value={shippingInfo.address}
-                    onChange={handleShippingChange}
-                    className={errors.address ? 'border-red-500' : ''}
-                  />
-                  {errors.address && (
-                    <p className="text-red-500 text-sm mt-1">{errors.address}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="city">{t('checkout.city')}</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    value={shippingInfo.city}
-                    onChange={handleShippingChange}
-                    className={errors.city ? 'border-red-500' : ''}
-                  />
-                  {errors.city && (
-                    <p className="text-red-500 text-sm mt-1">{errors.city}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="state">{t('checkout.state')}</Label>
-                  <Input
-                    id="state"
-                    name="state"
-                    value={shippingInfo.state}
-                    onChange={handleShippingChange}
-                    className={errors.state ? 'border-red-500' : ''}
-                  />
-                  {errors.state && (
-                    <p className="text-red-500 text-sm mt-1">{errors.state}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="zip">{t('checkout.zip')}</Label>
-                  <Input
-                    id="zip"
-                    name="zip"
-                    value={shippingInfo.zip}
-                    onChange={handleShippingChange}
-                    className={errors.zip ? 'border-red-500' : ''}
-                  />
-                  {errors.zip && (
-                    <p className="text-red-500 text-sm mt-1">{errors.zip}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="country">{t('checkout.country')}</Label>
-                  <Input
-                    id="country"
-                    name="country"
-                    value={shippingInfo.country}
-                    onChange={handleShippingChange}
-                    className={errors.country ? 'border-red-500' : ''}
-                  />
-                  {errors.country && (
-                    <p className="text-red-500 text-sm mt-1">{errors.country}</p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ShippingForm
+              shippingInfo={shippingInfo}
+              handleShippingChange={handleShippingChange}
+              errors={errors}
+            />
             
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
-                {t('checkout.payment')}
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="method">
-                    {language === 'en' ? 'Payment Method' : 'Método de Pago'}
-                  </Label>
-                  <select
-                    id="method"
-                    name="method"
-                    value={paymentInfo.method}
-                    onChange={handlePaymentChange}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-aurora-purple"
-                  >
-                    {PAYMENT_METHODS.map(method => (
-                      <option key={method.type} value={method.type}>
-                        {language === 'en' ? method.nameEn : method.nameEs}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                {currentPaymentMethod && (
-                  <div className="bg-gray-50 p-4 rounded-md space-y-4">
-                    <p className="text-aurora-neutral">
-                      {language === 'en' 
-                        ? currentPaymentMethod.instructionsEn 
-                        : currentPaymentMethod.instructionsEs}
-                    </p>
-                    
-                    {currentPaymentMethod.accountInfo && (
-                      <div className="bg-white p-3 rounded border">
-                        <pre className="text-sm">{currentPaymentMethod.accountInfo}</pre>
-                      </div>
-                    )}
-                    
-                    {currentPaymentMethod.type === 'creditCard' && (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="cardName">{t('checkout.cardName')}</Label>
-                          <Input
-                            id="cardName"
-                            name="cardName"
-                            value={paymentInfo.cardName}
-                            onChange={handlePaymentChange}
-                            className={errors.cardName ? 'border-red-500' : ''}
-                          />
-                          {errors.cardName && (
-                            <p className="text-red-500 text-sm mt-1">{errors.cardName}</p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="cardNumber">{t('checkout.cardNumber')}</Label>
-                          <Input
-                            id="cardNumber"
-                            name="cardNumber"
-                            value={paymentInfo.cardNumber}
-                            onChange={handlePaymentChange}
-                            placeholder="**** **** **** ****"
-                            className={errors.cardNumber ? 'border-red-500' : ''}
-                          />
-                          {errors.cardNumber && (
-                            <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="expiration">{t('checkout.expiration')}</Label>
-                            <Input
-                              id="expiration"
-                              name="expiration"
-                              value={paymentInfo.expiration}
-                              onChange={handlePaymentChange}
-                              placeholder="MM/YY"
-                              className={errors.expiration ? 'border-red-500' : ''}
-                            />
-                            {errors.expiration && (
-                              <p className="text-red-500 text-sm mt-1">{errors.expiration}</p>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <Label htmlFor="cvv">{t('checkout.cvv')}</Label>
-                            <Input
-                              id="cvv"
-                              name="cvv"
-                              value={paymentInfo.cvv}
-                              onChange={handlePaymentChange}
-                              className={errors.cvv ? 'border-red-500' : ''}
-                            />
-                            {errors.cvv && (
-                              <p className="text-red-500 text-sm mt-1">{errors.cvv}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {currentPaymentMethod.requiresProof && (
-                      <div>
-                        <Label htmlFor="paymentProof">
-                          {language === 'en' ? 'Upload Payment Proof' : 'Subir Comprobante de Pago'}
-                        </Label>
-                        <Input
-                          id="paymentProof"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleProofUpload}
-                          className={errors.paymentProof ? 'border-red-500' : ''}
-                        />
-                        {errors.paymentProof && (
-                          <p className="text-red-500 text-sm mt-1">{errors.paymentProof}</p>
-                        )}
-                        {paymentProof && (
-                          <div className="mt-2">
-                            <img
-                              src={URL.createObjectURL(paymentProof)}
-                              alt="Payment proof"
-                              className="max-h-32 rounded-md"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PaymentMethodForm
+              paymentMethod={currentPaymentMethod!}
+              paymentInfo={paymentInfo}
+              handlePaymentChange={handlePaymentChange}
+              handleProofUpload={handleProofUpload}
+              paymentProof={paymentProof}
+              errors={errors}
+              language={language}
+            />
           </div>
           
           <div>
-            <div className="bg-white rounded-lg shadow p-6 sticky top-28">
-              <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
-                {t('checkout.review')}
-              </h2>
-              
-              <div className="divide-y">
-                {items.map((item) => {
-                  const productName = language === 'en' ? item.product.nameEn : item.product.nameEs;
-                  return (
-                    <div key={item.product.id} className="py-3 flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md">
-                          <img 
-                            src={item.product.images[0]} 
-                            alt={productName} 
-                            className="h-full w-full object-cover object-center"
-                          />
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-aurora-dark">{productName}</p>
-                          <p className="text-xs text-aurora-neutral">
-                            {item.quantity} x {formatPrice(item.product.priceUSD)}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium text-aurora-neutral">
-                        {formatPrice(item.product.priceUSD * item.quantity)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <div className="space-y-2 pt-4 mt-4 border-t">
-                <div className="flex justify-between">
-                  <span className="text-aurora-neutral">{t('cart.subtotal')}</span>
-                  <span>{formatPrice(subtotal)}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-aurora-neutral">{t('cart.shipping')}</span>
-                  <span>
-                    {shippingCost === 0 
-                      ? (language === 'en' ? 'Free' : 'Gratis') 
-                      : formatPrice(shippingCost)}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-aurora-neutral">{t('cart.tax')}</span>
-                  <span>{formatPrice(taxAmount)}</span>
-                </div>
-                
-                <div className="flex justify-between pt-2 mt-2 border-t font-medium text-lg">
-                  <span>{t('cart.total')}</span>
-                  <span className="text-aurora-purple">{formatPrice(total)}</span>
-                </div>
-              </div>
-              
-              <Button
-                type="submit"
-                className="w-full mt-6 bg-aurora-purple hover:bg-aurora-darkpurple text-white"
-                disabled={isSubmitting}
-              >
-                {isSubmitting 
-                  ? (language === 'en' ? 'Processing...' : 'Procesando...') 
-                  : t('checkout.placeOrder')}
-              </Button>
-            </div>
+            <OrderSummary
+              items={items}
+              subtotal={subtotal}
+              shippingCost={shippingCost}
+              taxAmount={taxAmount}
+              total={total}
+              isSubmitting={isSubmitting}
+            />
           </div>
         </form>
       </SectionContainer>
