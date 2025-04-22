@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import ShippingForm from '@/components/checkout/ShippingForm';
 import PaymentMethodForm from '@/components/checkout/PaymentMethodForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
-import { PAYMENT_METHODS } from '@/types/payment';
+import { PAYMENT_METHODS, PaymentMethodType } from '@/types/payment';
 
 const CheckoutPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -68,7 +68,7 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPaymentInfo(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
@@ -78,6 +78,18 @@ const CheckoutPage: React.FC = () => {
         return newErrors;
       });
     }
+  };
+
+  const handlePaymentMethodChange = (value: PaymentMethodType) => {
+    setPaymentInfo(prev => ({ ...prev, method: value }));
+    if (errors.paymentProof) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.paymentProof;
+        return newErrors;
+      });
+    }
+    setPaymentProof(null);
   };
   
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,7 +245,7 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  const currentPaymentMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method);
+  const currentPaymentMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method) || PAYMENT_METHODS[0];
   
   return (
     <Layout>
@@ -247,9 +259,10 @@ const CheckoutPage: React.FC = () => {
             />
             
             <PaymentMethodForm
-              paymentMethod={currentPaymentMethod!}
+              paymentMethod={currentPaymentMethod}
               paymentInfo={paymentInfo}
               handlePaymentChange={handlePaymentChange}
+              handlePaymentMethodChange={handlePaymentMethodChange}
               handleProofUpload={handleProofUpload}
               paymentProof={paymentProof}
               errors={errors}
