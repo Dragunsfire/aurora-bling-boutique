@@ -1,4 +1,3 @@
-
 import { CartItem } from '../contexts/CartContext';
 import { Currency } from '../contexts/CurrencyContext';
 import { User } from '../contexts/AuthContext';
@@ -21,11 +20,12 @@ export interface ShippingInfo {
 
 // Define payment info
 export interface PaymentInfo {
-  method: 'creditCard' | 'bankTransfer';
-  cardNumber?: string; // Only for credit card
-  cardName?: string; // Only for credit card
-  expiration?: string; // Only for credit card
-  cvv?: string; // Only for credit card
+  method: PaymentMethodType;
+  cardNumber?: string;
+  cardName?: string;
+  expiration?: string;
+  cvv?: string;
+  proofImageUrl?: string;
 }
 
 // Define order type

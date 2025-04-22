@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -12,6 +11,8 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createOrder } from '@/data/orders';
 import { ShippingInfo, PaymentInfo } from '@/data/orders';
+import { PAYMENT_METHODS, PaymentMethodType } from '@/types/payment';
+import { useToast } from '@/components/ui/use-toast';
 
 const CheckoutPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -34,14 +35,10 @@ const CheckoutPage: React.FC = () => {
   
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>({
     method: 'creditCard',
-    cardNumber: '',
-    cardName: '',
-    expiration: '',
-    cvv: ''
   });
   
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const { toast } = useToast();
   
   // Calculate additional costs
   const shippingCost = subtotal > 100 ? 0 : 10; // Free shipping over $100
@@ -83,6 +80,24 @@ const CheckoutPage: React.FC = () => {
         delete newErrors[name];
         return newErrors;
       });
+    }
+  };
+  
+  // Handle payment proof upload
+  const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          title: language === 'en' ? 'Error' : 'Error',
+          description: language === 'en' 
+            ? 'Image size must be less than 5MB' 
+            : 'El tamaño de la imagen debe ser menor a 5MB',
+          variant: 'destructive'
+        });
+        return;
+      }
+      setPaymentProof(file);
     }
   };
   
@@ -129,7 +144,23 @@ const CheckoutPage: React.FC = () => {
       newErrors.country = language === 'en' ? 'Country is required' : 'El país es requerido';
     }
     
-    // Validate payment info if credit card is selected
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  // Validate payment info
+  const validatePaymentInfo = (): boolean => {
+    const selectedMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method);
+    if (!selectedMethod) return false;
+    
+    const newErrors: Record<string, string> = {};
+    
+    if (selectedMethod.requiresProof && !paymentProof) {
+      newErrors.paymentProof = language === 'en' 
+        ? 'Payment proof is required' 
+        : 'Se requiere comprobante de pago';
+    }
+    
     if (paymentInfo.method === 'creditCard') {
       if (!paymentInfo.cardName?.trim()) {
         newErrors.cardName = language === 'en' ? 'Card name is required' : 'El nombre en la tarjeta es requerido';
@@ -154,51 +185,70 @@ const CheckoutPage: React.FC = () => {
       }
     }
     
-    setErrors(newErrors);
+    setErrors(prev => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
   
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm() || !validatePaymentInfo()) {
       return;
     }
     
     setIsSubmitting(true);
     
-    // Simulate order processing
-    setTimeout(() => {
-      try {
-        if (user) {
-          // Create new order
-          const order = createOrder(
-            user,
-            items,
-            shippingInfo,
-            paymentInfo,
-            currency,
-            subtotal,
-            shippingCost,
-            taxAmount,
-            total,
-            language
-          );
-          
-          // Clear cart
-          clearCart();
-          
-          // Redirect to confirmation page
-          navigate(`/order-confirmation/${order.id}`);
-        }
-      } catch (error) {
-        console.error('Error creating order:', error);
-      } finally {
-        setIsSubmitting(false);
+    try {
+      // Simulate payment proof upload
+      let proofImageUrl;
+      if (paymentProof) {
+        // In a real app, this would upload to storage
+        proofImageUrl = URL.createObjectURL(paymentProof);
       }
-    }, 1500);
+      
+      // Create order with proof if provided
+      const finalPaymentInfo: PaymentInfo = {
+        ...paymentInfo,
+        proofImageUrl
+      };
+      
+      if (user) {
+        const order = createOrder(
+          user,
+          items,
+          shippingInfo,
+          finalPaymentInfo,
+          currency,
+          subtotal,
+          shippingCost,
+          taxAmount,
+          total,
+          language
+        );
+        
+        // Clear cart
+        clearCart();
+        
+        // Redirect to confirmation page
+        navigate(`/order-confirmation/${order.id}`);
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast({
+        title: language === 'en' ? 'Error' : 'Error',
+        description: language === 'en' 
+          ? 'There was an error processing your order' 
+          : 'Hubo un error procesando su orden',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+  
+  // Get current payment method info
+  const currentPaymentMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method);
   
   return (
     <Layout>
@@ -349,99 +399,133 @@ const CheckoutPage: React.FC = () => {
                 {t('checkout.payment')}
               </h2>
               
-              <div className="mb-4">
-                <Label htmlFor="method">
-                  {language === 'en' ? 'Payment Method' : 'Método de Pago'}
-                </Label>
-                <select
-                  id="method"
-                  name="method"
-                  value={paymentInfo.method}
-                  onChange={handlePaymentChange}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-aurora-purple"
-                >
-                  <option value="creditCard">
-                    {language === 'en' ? 'Credit Card' : 'Tarjeta de Crédito'}
-                  </option>
-                  <option value="bankTransfer">
-                    {language === 'en' ? 'Bank Transfer' : 'Transferencia Bancaria'}
-                  </option>
-                </select>
-              </div>
-              
-              {paymentInfo.method === 'creditCard' && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="cardName">{t('checkout.cardName')}</Label>
-                    <Input
-                      id="cardName"
-                      name="cardName"
-                      value={paymentInfo.cardName}
-                      onChange={handlePaymentChange}
-                      className={errors.cardName ? 'border-red-500' : ''}
-                    />
-                    {errors.cardName && (
-                      <p className="text-red-500 text-sm mt-1">{errors.cardName}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="cardNumber">{t('checkout.cardNumber')}</Label>
-                    <Input
-                      id="cardNumber"
-                      name="cardNumber"
-                      value={paymentInfo.cardNumber}
-                      onChange={handlePaymentChange}
-                      placeholder="**** **** **** ****"
-                      className={errors.cardNumber ? 'border-red-500' : ''}
-                    />
-                    {errors.cardNumber && (
-                      <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="expiration">{t('checkout.expiration')}</Label>
-                      <Input
-                        id="expiration"
-                        name="expiration"
-                        value={paymentInfo.expiration}
-                        onChange={handlePaymentChange}
-                        placeholder="MM/YY"
-                        className={errors.expiration ? 'border-red-500' : ''}
-                      />
-                      {errors.expiration && (
-                        <p className="text-red-500 text-sm mt-1">{errors.expiration}</p>
-                      )}
-                    </div>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="method">
+                    {language === 'en' ? 'Payment Method' : 'Método de Pago'}
+                  </Label>
+                  <select
+                    id="method"
+                    name="method"
+                    value={paymentInfo.method}
+                    onChange={handlePaymentChange}
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-aurora-purple"
+                  >
+                    {PAYMENT_METHODS.map(method => (
+                      <option key={method.type} value={method.type}>
+                        {language === 'en' ? method.nameEn : method.nameEs}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {currentPaymentMethod && (
+                  <div className="bg-gray-50 p-4 rounded-md space-y-4">
+                    <p className="text-aurora-neutral">
+                      {language === 'en' 
+                        ? currentPaymentMethod.instructionsEn 
+                        : currentPaymentMethod.instructionsEs}
+                    </p>
                     
-                    <div>
-                      <Label htmlFor="cvv">{t('checkout.cvv')}</Label>
-                      <Input
-                        id="cvv"
-                        name="cvv"
-                        value={paymentInfo.cvv}
-                        onChange={handlePaymentChange}
-                        className={errors.cvv ? 'border-red-500' : ''}
-                      />
-                      {errors.cvv && (
-                        <p className="text-red-500 text-sm mt-1">{errors.cvv}</p>
-                      )}
-                    </div>
+                    {currentPaymentMethod.accountInfo && (
+                      <div className="bg-white p-3 rounded border">
+                        <pre className="text-sm">{currentPaymentMethod.accountInfo}</pre>
+                      </div>
+                    )}
+                    
+                    {currentPaymentMethod.type === 'creditCard' && (
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="cardName">{t('checkout.cardName')}</Label>
+                          <Input
+                            id="cardName"
+                            name="cardName"
+                            value={paymentInfo.cardName}
+                            onChange={handlePaymentChange}
+                            className={errors.cardName ? 'border-red-500' : ''}
+                          />
+                          {errors.cardName && (
+                            <p className="text-red-500 text-sm mt-1">{errors.cardName}</p>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="cardNumber">{t('checkout.cardNumber')}</Label>
+                          <Input
+                            id="cardNumber"
+                            name="cardNumber"
+                            value={paymentInfo.cardNumber}
+                            onChange={handlePaymentChange}
+                            placeholder="**** **** **** ****"
+                            className={errors.cardNumber ? 'border-red-500' : ''}
+                          />
+                          {errors.cardNumber && (
+                            <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="expiration">{t('checkout.expiration')}</Label>
+                            <Input
+                              id="expiration"
+                              name="expiration"
+                              value={paymentInfo.expiration}
+                              onChange={handlePaymentChange}
+                              placeholder="MM/YY"
+                              className={errors.expiration ? 'border-red-500' : ''}
+                            />
+                            {errors.expiration && (
+                              <p className="text-red-500 text-sm mt-1">{errors.expiration}</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="cvv">{t('checkout.cvv')}</Label>
+                            <Input
+                              id="cvv"
+                              name="cvv"
+                              value={paymentInfo.cvv}
+                              onChange={handlePaymentChange}
+                              className={errors.cvv ? 'border-red-500' : ''}
+                            />
+                            {errors.cvv && (
+                              <p className="text-red-500 text-sm mt-1">{errors.cvv}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {currentPaymentMethod.requiresProof && (
+                      <div>
+                        <Label htmlFor="paymentProof">
+                          {language === 'en' ? 'Upload Payment Proof' : 'Subir Comprobante de Pago'}
+                        </Label>
+                        <Input
+                          id="paymentProof"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProofUpload}
+                          className={errors.paymentProof ? 'border-red-500' : ''}
+                        />
+                        {errors.paymentProof && (
+                          <p className="text-red-500 text-sm mt-1">{errors.paymentProof}</p>
+                        )}
+                        {paymentProof && (
+                          <div className="mt-2">
+                            <img
+                              src={URL.createObjectURL(paymentProof)}
+                              alt="Payment proof"
+                              className="max-h-32 rounded-md"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-              
-              {paymentInfo.method === 'bankTransfer' && (
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <p className="text-aurora-neutral">
-                    {language === 'en' 
-                      ? 'You will receive bank transfer instructions after placing your order.' 
-                      : 'Recibirá instrucciones de transferencia bancaria después de realizar su pedido.'}
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
           
