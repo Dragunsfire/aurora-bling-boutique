@@ -1,259 +1,183 @@
 
 import React, { useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateSalesReport, SalesReport } from '@/data/orders';
-import { useCurrency } from '@/contexts/CurrencyContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
-const AdminReports: React.FC = () => {
-  const { formatPrice } = useCurrency();
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+const AdminReports = () => {
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [showCurrency, setShowCurrency] = useState<'USD' | 'VES' | 'both'>('both');
   
-  // Generate report based on selected period
+  // Generate reports based on selected period
   const report = generateSalesReport(period);
   
-  // Prepare data for bar chart (sales by status)
-  const statusData = Object.entries(report.salesByStatus).map(([status, amount]) => ({
-    status: status.charAt(0).toUpperCase() + status.slice(1),
-    amount
+  // Prepare data for charts
+  const statusData = Object.entries(report.salesByStatus).map(([status, value]) => ({
+    status,
+    value
   }));
   
-  // Prepare data for pie chart (sales by currency)
-  const currencyData = Object.entries(report.salesByCurrency).map(([currency, amount]) => ({
+  const currencyData = Object.entries(report.salesByCurrency).map(([currency, value]) => ({
     currency,
-    amount,
-    value: amount // for pie chart
+    value
   }));
   
-  // Colors for charts
-  const COLORS = ['#9b87f5', '#7E69AB', '#D6BCFA', '#FFDEE2', '#F1F0FB'];
+  const filterCurrencyData = () => {
+    if (showCurrency === 'both') return currencyData;
+    return currencyData.filter(item => item.currency === showCurrency);
+  };
   
   return (
-    <AdminLayout title="Sales Reports">
-      {/* Period Selection */}
-      <div className="mb-6">
-        <div className="bg-white rounded-lg p-4 shadow">
-          <div className="text-lg font-medium mb-4">Select Report Period</div>
-          <div className="flex space-x-2">
-            <button
+    <AdminLayout>
+      <div className="container mx-auto p-4 space-y-8">
+        <h1 className="text-2xl font-playfair font-bold text-aurora-dark">Sales Reports</h1>
+        
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="status">By Status</TabsTrigger>
+            <TabsTrigger value="currency">By Currency</TabsTrigger>
+          </TabsList>
+          
+          <div className="flex gap-4 mt-4">
+            <TabsTrigger 
+              value={period === 'daily' ? 'active' : ''}
               onClick={() => setPeriod('daily')}
-              className={`px-4 py-2 rounded-md ${
-                period === 'daily'
-                  ? 'bg-aurora-purple text-white'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded ${period === 'daily' ? 'bg-aurora-purple text-white' : 'bg-gray-100'}`}
             >
               Daily
-            </button>
-            <button
+            </TabsTrigger>
+            <TabsTrigger 
+              value={period === 'weekly' ? 'active' : ''}
               onClick={() => setPeriod('weekly')}
-              className={`px-4 py-2 rounded-md ${
-                period === 'weekly'
-                  ? 'bg-aurora-purple text-white'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded ${period === 'weekly' ? 'bg-aurora-purple text-white' : 'bg-gray-100'}`}
             >
               Weekly
-            </button>
-            <button
+            </TabsTrigger>
+            <TabsTrigger 
+              value={period === 'monthly' ? 'active' : ''}
               onClick={() => setPeriod('monthly')}
-              className={`px-4 py-2 rounded-md ${
-                period === 'monthly'
-                  ? 'bg-aurora-purple text-white'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded ${period === 'monthly' ? 'bg-aurora-purple text-white' : 'bg-gray-100'}`}
             >
               Monthly
-            </button>
+            </TabsTrigger>
           </div>
-        </div>
-      </div>
-      
-      {/* Report Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-500">Total Sales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(report.totalSales)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-500">Order Count</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{report.orderCount}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-500">Average Order Value</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {report.averageOrderValue > 0 
-                ? formatPrice(report.averageOrderValue) 
-                : '$0.00'}
+          
+          <TabsContent value="overview" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="p-5">
+                <h3 className="text-sm text-aurora-neutral">Total Sales</h3>
+                <p className="text-3xl font-medium mt-2">${report.totalSales.toFixed(2)}</p>
+              </Card>
+              
+              <Card className="p-5">
+                <h3 className="text-sm text-aurora-neutral">Orders</h3>
+                <p className="text-3xl font-medium mt-2">{report.orderCount}</p>
+              </Card>
+              
+              <Card className="p-5">
+                <h3 className="text-sm text-aurora-neutral">Avg. Order Value</h3>
+                <p className="text-3xl font-medium mt-2">${report.averageOrderValue.toFixed(2)}</p>
+              </Card>
+              
+              <Card className="p-5">
+                <h3 className="text-sm text-aurora-neutral">Period</h3>
+                <p className="text-3xl font-medium mt-2 capitalize">{period}</p>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-500">Period</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{period}</div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales by Status (Bar Chart) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales by Order Status</CardTitle>
-            <CardDescription>Breakdown of sales by order status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={statusData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <Card className="p-5">
+                <h3 className="text-base font-medium mb-4">Sales by Status</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={statusData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="status" />
+                    <YAxis />
+                    <Tooltip formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Sales']} />
+                    <Bar dataKey="value" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+              
+              <Card className="p-5">
+                <h3 className="text-base font-medium mb-4">Sales by Currency</h3>
+                <div className="flex items-center space-x-2 mb-4">
+                  <Switch 
+                    id="currency-toggle" 
+                    checked={showCurrency !== 'both'} 
+                    onCheckedChange={() => setShowCurrency(showCurrency === 'both' ? 'USD' : 'both')}
+                  />
+                  <Label htmlFor="currency-toggle">
+                    {showCurrency === 'both' ? 'Show Both Currencies' : `Show ${showCurrency} Only`}
+                  </Label>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={filterCurrencyData()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="currency" />
+                    <YAxis />
+                    <Tooltip formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Sales']} />
+                    <Bar dataKey="value" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="status" className="mt-6">
+            <Card className="p-5">
+              <h3 className="text-lg font-medium mb-4">Sales by Order Status</h3>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={statusData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="status" />
                   <YAxis />
-                  <Tooltip 
-                    formatter={(value) => [`$${value.toFixed(2)}`, 'Amount']}
-                  />
+                  <Tooltip formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Sales']} />
                   <Legend />
-                  <Bar dataKey="amount" fill="#9b87f5" />
+                  <Bar dataKey="value" name="Sales" fill="#8884d8" />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Sales by Currency (Pie Chart) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales by Currency</CardTitle>
-            <CardDescription>Breakdown of sales by currency</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={currencyData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                    nameKey="currency"
-                    label={({ currency, percent }) => 
-                      `${currency}: ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {currencyData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[index % COLORS.length]} 
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => [`$${value.toFixed(2)}`, 'Amount']}
-                  />
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="currency" className="mt-6">
+            <Card className="p-5">
+              <h3 className="text-lg font-medium mb-4">Sales by Currency</h3>
+              <div className="flex items-center space-x-2 mb-4">
+                <Switch 
+                  id="currency-toggle-detail" 
+                  checked={showCurrency !== 'both'} 
+                  onCheckedChange={() => {
+                    if (showCurrency === 'both') setShowCurrency('USD');
+                    else if (showCurrency === 'USD') setShowCurrency('VES');
+                    else setShowCurrency('both');
+                  }}
+                />
+                <Label htmlFor="currency-toggle-detail">
+                  {showCurrency === 'both' 
+                    ? 'Show Both Currencies' 
+                    : `Show ${showCurrency} Only`}
+                </Label>
+              </div>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={filterCurrencyData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="currency" />
+                  <YAxis />
+                  <Tooltip formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Sales']} />
                   <Legend />
-                </PieChart>
+                  <Bar dataKey="value" name="Sales" fill="#82ca9d" />
+                </BarChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-      
-      {/* Sales Details Table */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Sales Details</CardTitle>
-          <CardDescription>Detailed breakdown of sales</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="text-xs uppercase text-gray-500 bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left">Category</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                  <th className="px-4 py-2 text-right">Percentage</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                <tr className="font-medium">
-                  <td className="px-4 py-2">Total Sales</td>
-                  <td className="px-4 py-2 text-right">{formatPrice(report.totalSales)}</td>
-                  <td className="px-4 py-2 text-right">100%</td>
-                </tr>
-                
-                {/* Status breakdown */}
-                <tr>
-                  <td colSpan={3} className="px-4 py-2 bg-gray-50 font-medium">
-                    By Status
-                  </td>
-                </tr>
-                {Object.entries(report.salesByStatus).map(([status, amount]) => {
-                  const percentage = report.totalSales > 0
-                    ? (amount / report.totalSales) * 100
-                    : 0;
-                  
-                  return (
-                    <tr key={status}>
-                      <td className="px-4 py-2 capitalize">{status}</td>
-                      <td className="px-4 py-2 text-right">{formatPrice(amount)}</td>
-                      <td className="px-4 py-2 text-right">
-                        {percentage.toFixed(1)}%
-                      </td>
-                    </tr>
-                  );
-                })}
-                
-                {/* Currency breakdown */}
-                <tr>
-                  <td colSpan={3} className="px-4 py-2 bg-gray-50 font-medium">
-                    By Currency
-                  </td>
-                </tr>
-                {Object.entries(report.salesByCurrency).map(([currency, amount]) => {
-                  const percentage = report.totalSales > 0
-                    ? (amount / report.totalSales) * 100
-                    : 0;
-                  
-                  return (
-                    <tr key={currency}>
-                      <td className="px-4 py-2">{currency}</td>
-                      <td className="px-4 py-2 text-right">{formatPrice(amount)}</td>
-                      <td className="px-4 py-2 text-right">
-                        {percentage.toFixed(1)}%
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </AdminLayout>
   );
 };

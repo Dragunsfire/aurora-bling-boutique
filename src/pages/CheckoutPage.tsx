@@ -21,6 +21,9 @@ const CheckoutPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
     firstName: '',
     lastName: '',
@@ -40,13 +43,11 @@ const CheckoutPage: React.FC = () => {
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const { toast } = useToast();
   
-  // Calculate additional costs
   const shippingCost = subtotal > 100 ? 0 : 10; // Free shipping over $100
   const taxRate = 0.07; // 7% tax
   const taxAmount = subtotal * taxRate;
   const total = subtotal + shippingCost + taxAmount;
   
-  // Redirect if not authenticated or cart is empty
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login', { state: { redirect: '/checkout' } });
@@ -55,11 +56,9 @@ const CheckoutPage: React.FC = () => {
     }
   }, [isAuthenticated, items.length, navigate]);
   
-  // Handle shipping info change
   const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setShippingInfo(prev => ({ ...prev, [name]: value }));
-    // Clear error when field is updated
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -69,11 +68,9 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  // Handle payment info change
   const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setPaymentInfo(prev => ({ ...prev, [name]: value }));
-    // Clear error when field is updated
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -83,11 +80,10 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  // Handle payment proof upload
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: language === 'en' ? 'Error' : 'Error',
           description: language === 'en' 
@@ -101,11 +97,9 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  // Validate form
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    // Validate shipping info
     if (!shippingInfo.firstName.trim()) {
       newErrors.firstName = language === 'en' ? 'First name is required' : 'El nombre es requerido';
     }
@@ -148,7 +142,6 @@ const CheckoutPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Validate payment info
   const validatePaymentInfo = (): boolean => {
     const selectedMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method);
     if (!selectedMethod) return false;
@@ -189,7 +182,6 @@ const CheckoutPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -200,14 +192,11 @@ const CheckoutPage: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Simulate payment proof upload
       let proofImageUrl;
       if (paymentProof) {
-        // In a real app, this would upload to storage
         proofImageUrl = URL.createObjectURL(paymentProof);
       }
       
-      // Create order with proof if provided
       const finalPaymentInfo: PaymentInfo = {
         ...paymentInfo,
         proofImageUrl
@@ -227,10 +216,8 @@ const CheckoutPage: React.FC = () => {
           language
         );
         
-        // Clear cart
         clearCart();
         
-        // Redirect to confirmation page
         navigate(`/order-confirmation/${order.id}`);
       }
     } catch (error) {
@@ -247,16 +234,13 @@ const CheckoutPage: React.FC = () => {
     }
   };
   
-  // Get current payment method info
   const currentPaymentMethod = PAYMENT_METHODS.find(m => m.type === paymentInfo.method);
   
   return (
     <Layout>
       <SectionContainer title={t('checkout.title')}>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Shipping and Payment */}
           <div className="col-span-2 space-y-8">
-            {/* Shipping Information */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
                 {t('checkout.shipping')}
@@ -393,7 +377,6 @@ const CheckoutPage: React.FC = () => {
               </div>
             </div>
             
-            {/* Payment Information */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
                 {t('checkout.payment')}
@@ -529,14 +512,12 @@ const CheckoutPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Right Column - Order Summary */}
           <div>
             <div className="bg-white rounded-lg shadow p-6 sticky top-28">
               <h2 className="text-lg font-playfair font-medium text-aurora-dark mb-4">
                 {t('checkout.review')}
               </h2>
               
-              {/* Order Items */}
               <div className="divide-y">
                 {items.map((item) => {
                   const productName = language === 'en' ? item.product.nameEn : item.product.nameEs;
@@ -565,7 +546,6 @@ const CheckoutPage: React.FC = () => {
                 })}
               </div>
               
-              {/* Totals */}
               <div className="space-y-2 pt-4 mt-4 border-t">
                 <div className="flex justify-between">
                   <span className="text-aurora-neutral">{t('cart.subtotal')}</span>
@@ -592,7 +572,6 @@ const CheckoutPage: React.FC = () => {
                 </div>
               </div>
               
-              {/* Place Order Button */}
               <Button
                 type="submit"
                 className="w-full mt-6 bg-aurora-purple hover:bg-aurora-darkpurple text-white"

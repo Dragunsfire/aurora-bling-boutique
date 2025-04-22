@@ -1,6 +1,8 @@
+
 import { CartItem } from '../contexts/CartContext';
 import { Currency } from '../contexts/CurrencyContext';
 import { User } from '../contexts/AuthContext';
+import { PaymentMethodType } from '../types/payment';
 
 // Define order status
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
